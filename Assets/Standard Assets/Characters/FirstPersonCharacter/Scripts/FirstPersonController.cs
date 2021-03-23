@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using TMPro;
 using UnityStandardAssets.CrossPlatformInput;
 using UnityStandardAssets.Utility;
 using Random = UnityEngine.Random;
@@ -28,6 +29,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
         [SerializeField] private AudioClip[] m_FootstepSounds;    // an array of footstep sounds that will be randomly selected from.
         [SerializeField] private AudioClip m_JumpSound;           // the sound played when character leaves the ground.
         [SerializeField] private AudioClip m_LandSound;           // the sound played when character touches back on ground.
+        [SerializeField] private TMP_Text healthText;
 
         private Camera m_Camera;
         private bool m_Jump;
@@ -44,6 +46,8 @@ namespace UnityStandardAssets.Characters.FirstPerson
         private AudioSource m_AudioSource;
 
         private Vector3 startPos;
+        public float health;
+        private float maxHealth = 100f;
 
         // Use this for initialization
         private void Start()
@@ -60,6 +64,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
 			m_MouseLook.Init(transform , m_Camera.transform);
 
             startPos = gameObject.transform.position;
+            health = maxHealth;
         }
 
 
@@ -86,6 +91,8 @@ namespace UnityStandardAssets.Characters.FirstPerson
             }
 
             m_PreviouslyGrounded = m_CharacterController.isGrounded;
+
+            healthText.text = ("Health: " + health.ToString());
         }
 
 
@@ -136,6 +143,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
             UpdateCameraPosition(speed);
 
             m_MouseLook.UpdateCursorLock();
+            RangeCheckHealth();
         }
 
 
@@ -269,6 +277,17 @@ namespace UnityStandardAssets.Characters.FirstPerson
                 gameObject.transform.position = startPos;
                 m_CharacterController.enabled = true;
             }
+        }
+
+        public void TakeDamage(float damage)
+        {
+            health -= damage;
+        }
+
+        private void RangeCheckHealth()
+        {
+            if (health > maxHealth) health = maxHealth;
+            else if (health < 0) health = 0;
         }
     }
 }

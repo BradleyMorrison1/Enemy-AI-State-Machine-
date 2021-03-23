@@ -14,12 +14,21 @@ public class Enemy : MonoBehaviour
     private int currentPatrolPoint; // used to cycle through patrol points
     private int patrolPointIncrement = 1; // added to the current patrol point to cycle
     private float playerDistance;
+    private float minDistance = 6f; // the minimum distance before the player is seen
+    private float maxDistance = 12f; // the maximum distance before the player has escaped
+    private float attackDistance = 1.8f;
+    private float searchWaitTimer;
     private float patrolWaitTime;
     private float patrolWaitTimer;
+    private float retreatCoolDownTime = 8f; // time until enemy can start looking for player after losing them in a chase
+    private float retreatCoolDownTimer;
     private bool isPatroling;
     private bool patrolTimerStarted; // used to timer is only started once
     private State currentState;
     private State lastState;
+    private Vector3 playerLastPos; // used when searching for player
+    public UnityStandardAssets.Characters.FirstPerson.FirstPersonController playerScript;
+
 
     enum State
     {
@@ -35,13 +44,14 @@ public class Enemy : MonoBehaviour
     {
         currentPatrolPoint = 0;
         currentState = State.patrolling;
-        
+
         ColorUtility.TryParseHtmlString("FF5A5A", out modelColor);
     }
 
     void Update()
     {
         modelMaterial.color = modelColor;
+        playerDistance = Vector3.Distance(player.transform.position, gameObject.transform.position);
         StateCheck();
     }
 
@@ -52,6 +62,7 @@ public class Enemy : MonoBehaviour
             case State.idle:
                 if (isPatroling) currentState = State.patrolling;
                 modelColor = Color.grey;
+                CheckChase();
                 if (lastState == State.patrolling)
                 {
                     patrolWaitTime = Random.Range(4f, 6f);
@@ -69,7 +80,8 @@ public class Enemy : MonoBehaviour
             case State.patrolling:
                 modelColor = Color.white;
                 Patrol();
-                if(!agent.hasPath && !agent.pathPending)
+                CheckChase();
+                if (!agent.hasPath && !agent.pathPending) // enemy has finished current path
                 {
                     lastState = State.patrolling;
                     currentState = State.idle;
@@ -77,19 +89,53 @@ public class Enemy : MonoBehaviour
                 break;
 
             case State.chasing:
-
+                modelColor = Color.red;
+                agent.SetDestination(player.transform.position);
+                if(playerDistance <= attackDistance) // enemy attacks player
+                {
+                    agent.isStopped = true;
+                    currentState = State.attacking;
+                }
+                else agent.isStopped = false;
+                if(playerDistance > maxDistance) // enemy lost player
+                {
+                    playerLastPos = player.transform.position;
+                    agent.SetDestination(playerLastPos);
+                    currentState = State.searching;
+                }
                 break;
 
             case State.searching:
-
+                modelColor = Color.blue;
+                CheckChase();
+                if (!agent.hasPath && !agent.pathPending) // enemy has finished current path
+                {
+                    searchWaitTimer += Time.deltaTime;
+                    if (searchWaitTimer > 3f)
+                    {
+                        retreatCoolDownTimer = 0f;
+                        currentState = State.retreating;
+                    }
+                }
                 break;
 
             case State.attacking:
-
+                agent.isStopped = true;
+                modelColor = Color.yellow;
+                playerScript.TakeDamage(Random.Range(10f, 15f));
+                currentState = State.chasing;
                 break;
 
             case State.retreating:
-
+                modelColor = Color.green;
+                Patrol();
+                retreatCoolDownTimer += Time.deltaTime;
+                if(retreatCoolDownTimer >= retreatCoolDownTime)
+                {
+                    Debug.Log("Retreat Cooldown Over");
+                    CheckChase();
+                    currentState = State.patrolling;
+                }
                 break;
         }
     }
@@ -119,5 +165,14 @@ public class Enemy : MonoBehaviour
     {
         if (!patrolTimerStarted) patrolWaitTimer = 0f;
         patrolWaitTimer += Time.deltaTime;
+    }
+
+    private void CheckChase()
+    {
+        if (currentState == State.chasing || currentState == State.attacking) return;
+        if(playerDistance < minDistance)
+        {
+            currentState = State.chasing;
+        }
     }
 }
